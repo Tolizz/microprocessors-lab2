@@ -162,14 +162,13 @@ void my_systick_callback(void) {
         if (led_counter >= led_toggle_limit) {
             led_counter = 0;
             current_led_state = !current_led_state; // Toggle
-            leds_set(current_led_state, current_led_state, current_led_state);
+            leds_set(current_led_state, 0, 0);
         }
     }
 }
 
 // --- EXTI Button Interrupt Handler (Highest Priority) ---
-void button_exti_isr(int status) {
-    // Note: status contains the pin index (13 for PC13)
+void button_exti_isr() {
     
     if (currentState != STATE_ESTOP && currentState != STATE_AWAIT_UNLOCK) {
         // 1st Press: Enter E-STOP mode
@@ -209,7 +208,14 @@ void uart_rx_isr(uint8_t rx) {
             rx_index = 0;               // Reset for next input
             stop_timeout_timer();       // Stop timeout timer since Enter was pressed
         }
-    } else {
+    }
+		else if (received_char == '\b' || received_char == 0x7F) {
+        if (rx_index > 0) {
+            rx_index--; // Delete last character from buffer
+            uart_print("\b \b"); // Erase character visually on terminal
+        }
+    }
+		else {
         if (rx_index == 0) {
             // Start 4-second timeout timer on first character
             start_timeout_timer(4); 
@@ -233,7 +239,7 @@ void execute_current_digit(void) {
     if (current_char >= '1' && current_char <= '9') {
         uint8_t hz = current_char - '0'; // Convert char to integer
         set_led_frequency(hz);
-    } else if (current_char == '0') {
+    } else {
         set_led_frequency(0); // LED off
     }
 }
@@ -242,7 +248,7 @@ int main() {
     // --- 1. HARDWARE INIT ---
     
     // Init UART
-    uart_init(115200);
+    uart_init(9600);
     uart_set_rx_callback(uart_rx_isr);
     uart_enable();
     
